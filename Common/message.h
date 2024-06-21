@@ -16,7 +16,7 @@ namespace clsrv
 		struct message
 		{
 			message_header<T> header{};
-			vector<uint8_t> body;
+			std::vector<uint8_t> body;
 
 			size_t size() const
 			{
@@ -32,8 +32,8 @@ namespace clsrv
 			template<typename DataType>
 			friend message<T>& operator << (message<T>& msg, const DataType& data)
 			{
-				static assert(std::is_standard_layout<DataType>::value, "Data is too complex to handle")
-				size_t i = msg.body.size()
+				//static assert(std::is_standard_layout<DataType>::value, "Data is too complex to handle");
+				size_t i = msg.body.size();
 				msg.body.resize(msg.body.size() + sizeof(DataType));
 				std::memcpy(msg.body.data() + i, &data, sizeof(DataType));
 				msg.header.size = msg.size();
@@ -43,30 +43,29 @@ namespace clsrv
 			template<typename DataType>
 			friend message<T>& operator >> (message<T>& msg, const DataType& data)
 			{
-				static assert(std::is_standard_layout<DataType>::value, "Data is too complex to handle")
-				size_t i = msg.body.size() - sizeof(Datatype);
+				//static assert(std::is_standard_layout<DataType>::value, "Data is too complex to handle");
+				size_t i = msg.body.size() - sizeof(DataType);
 				std::memcpy(msg.body.data() + i, &data, sizeof(DataType));
 				msg.body.resize(i);
 				msg.header.size = msg.size();
 				return msg;
 			}
+		};
 
-			template <typename T>
-			class connection;
+		template<typename T>
+		class connection;
 
-			template <typename T>
-			struct owned_message
+		template <typename T>
+		struct owned_message
+		{
+			std::shared_ptr<connection<T>> remote = nullptr;
+			message<T> msg;
+
+			friend std::ostream& operator << (std::ostream os, const owned_message<T>& msg)
 			{
-				std::shared_ptr<connection<T>> remote = nullptr;
-				message<T> msg;
-
-				friend std::ostream& operator << (std::ostream os, const owned_message<T>& msg)
-				{
-					os << msg.msg;
-					return os; 
-				}
-
-			};
+				os << msg.msg;
+				return os; 
+			}
 
 		};
 	}
