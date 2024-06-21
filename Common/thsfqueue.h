@@ -12,7 +12,7 @@ namespace clsrv
 			ThSfQueue() = default;
 			ThSfQueue(const ThSfQueue<T>&) = delete;
 
-			virtual ~thsfqueue()
+			virtual ~ThSfQueue()
 			{
 				clear();
 			}
