@@ -8,7 +8,14 @@ enum class CustomMsgTypes : uint32_t
 	Move
 };
 
+class Client : public clsrv::net::ClientInterface<CustomMsgTypes>
+{
+public:
+};
+
 int main()
 {
+	//Client c;
+	//c.connect("", 60000);
 	return 0;
 }

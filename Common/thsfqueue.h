@@ -6,11 +6,11 @@ namespace clsrv
 	namespace net
 	{
 		template<typename T>
-		class thsfqueue
+		class ThSfQueue
 		{
 		public:
-			thsfqueue() = default;
-			thsfqueue(const thsfqueue<T>&) = delete;
+			ThSfQueue() = default;
+			ThSfQueue(const ThSfQueue<T>&) = delete;
 
 			virtual ~thsfqueue()
 			{
