@@ -13,7 +13,7 @@ namespace clsrv
 		class ServerInterface
 		{
 		public:
-			ServerInterface(uint16_t port) : m_asioAcceptor(m_asioAcceptor, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port))
+			ServerInterface(uint16_t port) : m_asioAcceptor(m_asioContext, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port))
 			{
 
 			}
@@ -56,15 +56,20 @@ namespace clsrv
 						if (!ec)
 						{
 							std::cout << "[SERVER] New Connection: " << socket.remote_endpoint() << "\n";
-							std::shared_ptr<connection<T>> newconn = std::make_shared<connection<T>>(connection<T>::owner::server, m_asioContext, std::move(socket), m_qMessagesIn);
-							
+							std::shared_ptr<connection<T>> newconn =
+								std::make_shared<connection<T>>(connection<T>::owner::server,
+									m_asioContext, std::move(socket), m_qMessagesIn);
+
 							if (onClientConnect(newconn))
 							{
 								m_deqConnections.push_back(std::move(newconn));
 								m_deqConnections.back()->connectToClient(nIDCounter++);
-								std::cout << "[" << m_deqConnections.back()->GetId() << "] Connection Approved\n";
+								std::cout << "[" << m_deqConnections.back()->getID() << "] Connection Approved\n";
 							}
-
+							else
+							{
+								std::cout << "[-----] Connection Denied\n";
+							}
 						}
 						else
 						{
@@ -85,7 +90,7 @@ namespace clsrv
 				{
 					onClientDisconnect(client);
 					client.reset();
-					m_deqConnections.erase(std::remove(m_deqConnections.begin(), m_deqConnections.end(), client), mdeq_Connections.end());
+					this.m_deqConnections.erase(std::remove(this.m_deqConnections.begin(), this.m_deqConnections.end(), client), this.mdeq_Connections.end());
 
 				}
 			}
@@ -96,7 +101,7 @@ namespace clsrv
 
 				while (nMessageCount < nMaxMessages && !m_qMessagesIn.empty())
 				{
-					auto msg = m_qMessageIn.pop_front();
+					auto msg = m_qMessagesIn.pop_front();
 
 					onMessage(msg.remote, msg.msg);
 
@@ -110,15 +115,9 @@ namespace clsrv
 				return false;
 			}
 
-			virtual void onClientDisconnect(std::shared_ptr<connection<T>> client)
-			{
+			virtual void onClientDisconnect(std::shared_ptr<connection<T>> client){}
 
-			}
-
-			virtual void onMessage(std::shared_ptr<connection<T>> client, message<T>& msg)
-			{
-
-			}
+			virtual void onMessage(std::shared_ptr<connection<T>> client, message<T>& msg){}
 
 		protected:
 			ThSfQueue<owned_message<T>> m_qMessagesIn;

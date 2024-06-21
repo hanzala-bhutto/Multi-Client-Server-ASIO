@@ -11,8 +11,8 @@ namespace clsrv
 		template <typename T>
 		class ClientInterface
 		{
-
-			ClientInterface() : m_scoket(m_context)
+		public:
+			ClientInterface()
 			{}
 
 			virtual ~ClientInterface()
@@ -25,31 +25,31 @@ namespace clsrv
 			{
 				try
 				{
-					m_connection = std::make_unique<connection<T>>();
 					asio::ip::tcp::resolver resolver(m_context);
-					m_endpoints = resolver.resolve(host, std::to_string(port));
-					m_connection->connectToServer(m_endpoints);
-					thrContext = std::thread([this]() {m_context.run();})
+					asio::ip::tcp::resolver::results_type endpoints = resolver.resolve(host, std::to_string(port));
+					m_connection = std::make_unique<connection<T>>(connection<T>::owner::client, m_context, asio::ip::tcp::socket(m_context), m_qMessagesIn);
+					m_connection->connectToServer(endpoints);
+					thrContext = std::thread([this]() { m_context.run(); });
 				}
 				catch (std::exception& e)
 				{
 					std::cerr << "Client Exception: " << e.what() << "\n";
 					return false;
 				}
-				return false;
+				return true;
 			}
 
 			void disconnect()
-			{
-				if (isConnceted())
-					m_connection->diconnect();
-
+			{			
+				if (isConnected())
+				{
+					m_connection->disconnect();
+				}				
 				m_context.stop();
-				if (thrContext.joinable)
+				if (thrContext.joinable())
 					thrContext.join();
 				m_connection.release();
 			}
-
 			bool isConnected()
 			{
 				if (m_connection)
@@ -58,7 +58,13 @@ namespace clsrv
 					return false;
 			}
 
-			ThSfQueue<owned_message<T>>& incoming()
+		public:
+			void send(const message<T>& msg)
+			{
+				if (isConnected())
+					m_connection->Send(msg);
+			}
+			ThSfQueue<owned_message<T>>& Incoming()
 			{
 				return m_qMessagesIn;
 			}
@@ -66,11 +72,10 @@ namespace clsrv
 		protected:
 			asio::io_context m_context;
 			std::thread thrContext;
-			asio::ip::tcp::socket m_socket;
 			std::unique_ptr<connection<T>> m_connection;
-		
+
 		private:
 			ThSfQueue<owned_message<T>> m_qMessagesIn;
 		};
-	}
+	};
 }
