@@ -11,13 +11,7 @@ enum class CustomMsgTypes : uint32_t
 	MessageAll,
 	ServerMessage,
 	ServerMessageToClient,
-	ServerMessageToAllClients
 };
-
-void convertStringToChar()
-{
-
-}
 
 class CustomClient : public clsrv::net::ClientInterface<CustomMsgTypes>
 {
@@ -34,7 +28,6 @@ public:
 
 	void messageServer()
 	{
-		
 		clsrv::net::message<CustomMsgTypes> msg;
 		msg.header.id = CustomMsgTypes::MessageServer;
 		std::string hero;
