@@ -88,7 +88,6 @@ public:
 		{
 			if (client && client->isConnected())
 			{
-				std::cout << client->getID() << static_cast<uint32_t>(id) << std::endl;
 				if (client->getID() == static_cast<uint32_t>(id))
 				{
 					messageClient(client, msg);
