@@ -7,27 +7,44 @@ enum class CustomMsgTypes : uint32_t
 	ServerAccept,
 	ServerDeny,
 	ServerPing,
+	MessageServer,
 	MessageAll,
-	ServerMessage
+	ServerMessage,
+	ServerMessageToClient,
+	ServerMessageToAllClients
 };
 
+void convertStringToChar()
+{
 
-class Client : public clsrv::net::ClientInterface<CustomMsgTypes>
+}
+
+class CustomClient : public clsrv::net::ClientInterface<CustomMsgTypes>
 {
 public:
-	void PingServer()
+	void pingServer()
 	{
 		clsrv::net::message<CustomMsgTypes> msg;
 		msg.header.id = CustomMsgTypes::ServerPing;
-
-		// Caution with this...
 		std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
-
 		msg << timeNow;
-		this->send(msg);
+		//std :: cout << msg << std::endl;
+		send(msg);
 	}
 
-	void MessageAll()
+	void messageServer()
+	{
+		
+		clsrv::net::message<CustomMsgTypes> msg;
+		msg.header.id = CustomMsgTypes::MessageServer;
+		std::string hero;
+		std::cout << "Enter message to send to server: ";
+		std::getline(std::cin, hero);
+		msg << hero;
+		send(msg);
+	}
+
+	void messageAll()
 	{
 		clsrv::net::message<CustomMsgTypes> msg;
 		msg.header.id = CustomMsgTypes::MessageAll;
@@ -35,46 +52,47 @@ public:
 	}
 };
 
-
 int main()
 {
-	Client c;
+	CustomClient c;
 	c.connect("127.0.0.1", 6000);
 
-	bool key[3] = { false, false, false };
-	bool old_key[3] = { false, false, false };
+	bool key[4] = { false, false, false, false };
+	bool old_key[4] = { false, false, false, false };
+
+	HWND name;
+	name = GetForegroundWindow();
 
 	bool bQuit = false;
 	while (!bQuit)
 	{
-		if (GetForegroundWindow() == GetConsoleWindow())
+		HWND hwndForeground = GetForegroundWindow();
+
+		if (hwndForeground == name)
 		{
 			key[0] = GetAsyncKeyState('1') & 0x8000;
 			key[1] = GetAsyncKeyState('2') & 0x8000;
 			key[2] = GetAsyncKeyState('3') & 0x8000;
+			key[3] = GetAsyncKeyState('4') & 0x8000;
 		}
 
-		if (key[0] && !old_key[0]){ 
-			c.PingServer();std::cout << "Hero";
-		}
-		if (key[1] && !old_key[1]) c.MessageAll();
-		if (key[2] && !old_key[2]) bQuit = true;
+		if (key[0] && !old_key[0]) c.pingServer();
+		if (key[1] && !old_key[1]) c.messageServer();
+		if (key[2] && !old_key[2]) c.messageAll();
+		if (key[3] && !old_key[3]) bQuit = true;
 
 		for (int i = 0; i < 3; i++) old_key[i] = key[i];
 
 		if (c.isConnected())
 		{
-			if (!c.Incoming().empty())
+			if (!c.incoming().empty())
 			{
-
-
-				auto msg = c.Incoming().pop_front().msg;
+				auto msg = c.incoming().pop_front().msg;
 
 				switch (msg.header.id)
 				{
 				case CustomMsgTypes::ServerAccept:
 				{
-					// Server has responded to a ping request				
 					std::cout << "Server Accepted Connection\n";
 				}
 				break;
@@ -82,7 +100,6 @@ int main()
 
 				case CustomMsgTypes::ServerPing:
 				{
-					// Server has responded to a ping request
 					std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
 					std::chrono::system_clock::time_point timeThen;
 					msg >> timeThen;
@@ -92,10 +109,17 @@ int main()
 
 				case CustomMsgTypes::ServerMessage:
 				{
-					// Server has responded to a ping request	
 					uint32_t clientID;
 					msg >> clientID;
 					std::cout << "Hello from [" << clientID << "]\n";
+				}
+				break;
+
+				case CustomMsgTypes::ServerMessageToClient:
+				{
+					std::string message;
+					msg >> message;
+					std::cout << "[SERVER said]: " << message << "\n";
 				}
 				break;
 				}
@@ -111,4 +135,3 @@ int main()
 
 	return 0;
 }
- 
