@@ -90,21 +90,39 @@ namespace clsrv
 				{
 					onClientDisconnect(client);
 					client.reset();
-					this.m_deqConnections.erase(std::remove(this.m_deqConnections.begin(), this.m_deqConnections.end(), client), this.mdeq_Connections.end());
+					m_deqConnections.erase(std::remove(m_deqConnections.begin(), m_deqConnections.end(), client), m_deqConnections.end());
 
 				}
+			}
+
+			void messageAllClients(const message<T>& msg, std::shared_ptr<connection<T>> pIgnoreClient = nullptr)
+			{
+				bool bInvalidClientExists = false;
+				for (auto& client : m_deqConnections)
+				{
+					if (client && client->isConnected())
+					{
+						if (client != pIgnoreClient)
+							client->send(msg);
+					}
+					else
+					{
+						onClientDisconnect(client);
+						client.reset();
+						bInvalidClientExists = true;
+					}
+				}
+				if (bInvalidClientExists)
+					m_deqConnections.erase(std::remove(m_deqConnections.begin(), m_deqConnections.end(), nullptr), m_deqConnections.end());
 			}
 
 			void update(size_t nMaxMessages = -1)
 			{
 				size_t nMessageCount = 0;
-
 				while (nMessageCount < nMaxMessages && !m_qMessagesIn.empty())
 				{
 					auto msg = m_qMessagesIn.pop_front();
-
 					onMessage(msg.remote, msg.msg);
-
 					nMessageCount++;
 				}
 			}

@@ -62,9 +62,9 @@ namespace clsrv
 			void send(const message<T>& msg)
 			{
 				if (isConnected())
-					m_connection->Send(msg);
+					m_connection->send(msg);
 			}
-			ThSfQueue<owned_message<T>>& Incoming()
+			ThSfQueue<owned_message<T>>& incoming()
 			{
 				return m_qMessagesIn;
 			}
