@@ -135,14 +135,12 @@ int main()
 	bool bQuit = false;
 	while (!bQuit)
 	{
-
 		HWND hwndForeground = GetForegroundWindow();
 		if (hwndForeground == name) {
 			key[0] = GetAsyncKeyState('1') & 0x8000;
 			key[1] = GetAsyncKeyState('2') & 0x8000;
 			key[2] = GetAsyncKeyState('3') & 0x8000;
 		}
-
 		if (key[0] && !old_key[0]) s.messageToClient();
 		if (key[1] && !old_key[1]) s.messageToAllClients();
 		if (key[2] && !old_key[2]) bQuit = true;
@@ -150,7 +148,6 @@ int main()
 		for (int i = 0; i < 3; i++) old_key[i] = key[i];
 
 		s.update();
-
 	}
 
 	return 0;
