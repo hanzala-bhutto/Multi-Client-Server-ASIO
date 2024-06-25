@@ -11,6 +11,8 @@ enum class CustomMsgTypes : uint32_t
 	MessageAll,
 	ServerMessage,
 	ServerMessageToClient,
+	SendFile,
+	ReceiveFile
 };
 
 class CustomClient : public clsrv::net::ClientInterface<CustomMsgTypes>
@@ -43,6 +45,71 @@ public:
 		msg.header.id = CustomMsgTypes::MessageAll;
 		send(msg);
 	}
+
+	void handler(
+		const asio::error_code& error, // Result of operation.
+		std::size_t bytes_transferred // Number of bytes read.
+	)
+	{
+		std::cout << bytes_transferred << std::endl;
+	}
+
+	void grabData(asio::stream_file &file)
+	{
+
+		clsrv::net::message<CustomMsgTypes> msg;
+
+
+
+		msg.header.id = CustomMsgTypes::SendFile;
+		msg.header.size = static_cast<uint32_t>(file.size());
+
+		size_t            bufferSize = 1024;
+		std::vector<char> buffer(bufferSize);
+
+
+		file.async_read_some
+		(asio::buffer(buffer, bufferSize),
+			[this,&msg,&buffer, &file](std::error_code ec, std::size_t length)
+			{
+				if (!ec)
+				{
+					msg.body.insert(msg.body.end(), buffer.begin(), buffer.end());
+					send(msg);
+
+					for(auto c: buffer)
+					{
+						std::cout << c;
+					}
+
+					grabData(file);
+
+				}
+				else
+				{
+					std::cout << "[" << "] Write Header Fail.\n";
+				}
+			}
+		);
+	}
+
+	void sendFile()
+	{
+		auto fileName = "Hero.txt";
+		try
+		{
+			asio::stream_file file(m_context, fileName, asio::stream_file::flags::read_only);
+			std::cout << file.size() << std::endl;
+			m_context.run();
+			grabData(file);
+			
+		}
+		catch (std::exception& e)
+		{
+			std::cerr << e.what() << std::endl;
+		}
+	}
+
 };
 
 int main()
@@ -50,8 +117,8 @@ int main()
 	CustomClient c;
 	c.connect("127.0.0.1", 6000);
 
-	bool key[4] = { false, false, false, false };
-	bool old_key[4] = { false, false, false, false };
+	bool key[5] = { false, false, false, false , false};
+	bool old_key[5] = { false, false, false, false, false };
 
 	HWND hwndForeground;
 	hwndForeground = GetForegroundWindow();
@@ -67,12 +134,14 @@ int main()
 			key[1] = GetAsyncKeyState('2') & 0x8000;
 			key[2] = GetAsyncKeyState('3') & 0x8000;
 			key[3] = GetAsyncKeyState('4') & 0x8000;
+			key[4] = GetAsyncKeyState('5') & 0x8000;
 		}
 
 		if (key[0] && !old_key[0]) c.pingServer();
 		if (key[1] && !old_key[1]) c.messageServer();
 		if (key[2] && !old_key[2]) c.messageAll();
-		if (key[3] && !old_key[3]) bQuit = true;
+		if (key[3] && !old_key[3]) c.sendFile();
+		if (key[4] && !old_key[4]) bQuit = true;
 
 		for (int i = 0; i < 3; i++) old_key[i] = key[i];
 
@@ -115,6 +184,7 @@ int main()
 					std::cout << "[SERVER said]: " << message << "\n";
 				}
 				break;
+
 				}
 			}
 		}

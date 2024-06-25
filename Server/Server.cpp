@@ -10,6 +10,8 @@ enum class CustomMsgTypes : uint32_t
 	MessageAll,
 	ServerMessage,
 	ServerMessageToClient,
+	SendFile,
+	ReceiveFile
 };
 
 class Server : public clsrv::net::ServerInterface<CustomMsgTypes>
@@ -63,6 +65,17 @@ protected:
 			messageAllClients(msg, client);
 		}
 		break;
+
+		case CustomMsgTypes::SendFile:
+		{
+			std::string hero;
+			msg >> hero;
+
+			std::cout << "[" << client->getID() << "]: ";
+			std::cout << hero << std::endl;
+		}
+		break;
+
 		}
 	}
 public:
