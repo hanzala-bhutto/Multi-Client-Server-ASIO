@@ -53,15 +53,15 @@ int main()
 	bool key[4] = { false, false, false, false };
 	bool old_key[4] = { false, false, false, false };
 
-	HWND name;
-	name = GetForegroundWindow();
+	HWND hwndForeground;
+	hwndForeground = GetForegroundWindow();
 
 	bool bQuit = false;
 	while (!bQuit)
 	{
-		HWND hwndForeground = GetForegroundWindow();
+		HWND currentForeground = GetForegroundWindow();
 
-		if (hwndForeground == name)
+		if (hwndForeground == currentForeground)
 		{
 			key[0] = GetAsyncKeyState('1') & 0x8000;
 			key[1] = GetAsyncKeyState('2') & 0x8000;

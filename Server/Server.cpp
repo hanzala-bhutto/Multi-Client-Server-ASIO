@@ -40,7 +40,6 @@ protected:
 			std::chrono::system_clock::time_point timeThen;
 			msg << timeThen;
 			std::cout << "[" << client->getID() << "]: Server Ping\n";
-			// Simply bounce message back to client
 			client->send(msg);
 		}
 		break;
@@ -120,22 +119,17 @@ int main()
 	Server s(6000);
 	s.start();
 
-	//while (1)
-	//{
-	//	s.update();
-	//}
-
 	bool key[3] = { false, false, false };
 	bool old_key[3] = { false, false, false };
 
-	HWND name;
-	name = GetForegroundWindow();
+	HWND hwndForeground;
+	hwndForeground = GetForegroundWindow();
 
 	bool bQuit = false;
 	while (!bQuit)
 	{
-		HWND hwndForeground = GetForegroundWindow();
-		if (hwndForeground == name) {
+		HWND currentForeground = GetForegroundWindow();
+		if (hwndForeground == currentForeground) {
 			key[0] = GetAsyncKeyState('1') & 0x8000;
 			key[1] = GetAsyncKeyState('2') & 0x8000;
 			key[2] = GetAsyncKeyState('3') & 0x8000;
