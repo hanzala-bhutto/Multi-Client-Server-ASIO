@@ -80,6 +80,32 @@ namespace clsrv
 				return msg;
 			}
 
+			template<typename DataType>
+			friend message<T>& operator<<(message<T>& msg, const std::vector<DataType>& vec) {
+
+				std::cout << vec.size() << std::endl;
+
+				size_t i = msg.body.size();
+				msg.body.resize(msg.body.size() + vec.size());
+				std::memcpy(msg.body.data() + i, &vec, vec.size());
+				msg.header.size = msg.size();
+				return msg;
+			}
+
+			// Overloaded operator >> for std::vector
+			template<typename DataType>
+			friend message<T>& operator>>(message<T>& msg, std::vector<DataType>& vec) {
+				vec.clear();
+				vec.resize(msg.body.size());
+				size_t i = msg.body.size() - sizeof(DataType);
+				vec.assign(msg.body.begin(), msg.body.end());
+				msg.body.resize(i);
+				msg.header.size = msg.size();
+
+				return msg;
+			}
+
+
 		};
 
 		template <typename T>
