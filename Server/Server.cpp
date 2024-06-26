@@ -1,19 +1,6 @@
 #include <iostream>
 #include <clsrv_net.h>
 
-enum class CustomMsgTypes : uint32_t
-{
-	ServerAccept,
-	ServerDeny,
-	ServerPing,
-	MessageServer,
-	MessageAll,
-	ServerMessage,
-	ServerMessageToClient,
-	SendFile,
-	ReceiveFile
-};
-
 class Server : public clsrv::net::ServerInterface<CustomMsgTypes>
 {
 public:
@@ -66,15 +53,64 @@ protected:
 		}
 		break;
 
-		case CustomMsgTypes::SendFile:
+		case CustomMsgTypes::UploadFile:
 		{
-			std::string hero;
-			msg >> hero;
+			try 
+			{
+				std::string out_path = "C:/Users/HBhutto/source/repos/Client_Server/Multi-Client-Server-ASIO/Server/FilesDatabase/" + std::to_string(client->getID());
+			
 
-			std::cout << "[" << client->getID() << "]: ";
-			std::cout << hero << std::endl;
+				if (!std::filesystem::exists(out_path)) {
+					std::filesystem::create_directory(out_path);
+				}
+
+				//out_path = out_path + "/Hero.txt";
+				out_path = out_path + "/Client-Server-App.zip";
+
+				std::ofstream targetFile;
+				targetFile.open(out_path, std::ios_base::binary);
+
+				std::vector<uint8_t> buffer(msg.size());
+				buffer = std::move(msg.body);
+
+				targetFile.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
+
+				std::cout << "[" << client->getID() << "]: ";
+				std::cout << buffer.size() << std::endl;
+			}
+			catch (std::exception &ex)
+			{
+				std::cout << ex.what() << std::endl;
+			}
 		}
 		break;
+
+		case CustomMsgTypes::UploadMore:
+		{
+			try
+			{
+				std::string out_path = "C:/Users/HBhutto/source/repos/Client_Server/Multi-Client-Server-ASIO/Server/FilesDatabase/" + std::to_string(client->getID());
+				//out_path = out_path + "/Hero.txt";
+				out_path = out_path + "/Client-Server-App.zip";
+
+				std::ofstream targetFile;
+				targetFile.open(out_path, std::ios_base::binary | std::ios_base::app);
+
+				std::vector<uint8_t> buffer(msg.size());
+				buffer = std::move(msg.body);
+
+				targetFile.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
+
+				std::cout << "[" << client->getID() << "]: ";
+				std::cout << buffer.size() << std::endl;
+			}
+			catch (std::exception& ex)
+			{
+				std::cout << ex.what() << std::endl;
+			}
+		}
+		break;
+
 
 		}
 	}
