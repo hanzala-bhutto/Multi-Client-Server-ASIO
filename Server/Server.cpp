@@ -55,110 +55,121 @@ protected:
 
 		case CustomMsgTypes::UploadFile:
 		{
-			try 
-			{
-				std::string out_path = "C:/Users/HBhutto/source/repos/Client_Server/Multi-Client-Server-ASIO/Server/FilesDatabase/" + std::to_string(client->getID());
-			
-
-				if (!std::filesystem::exists(out_path)) {
-					std::filesystem::create_directory(out_path);
-				}
-
-				//out_path = out_path + "/Hero.txt";
-				out_path = out_path + "/Client-Server-App.zip";
-
-				std::ofstream targetFile;
-				targetFile.open(out_path, std::ios_base::binary);
-
-				std::vector<uint8_t> buffer(msg.size());
-				buffer = std::move(msg.body);
-
-				targetFile.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
-
-				std::cout << "[" << client->getID() << "]: ";
-				std::cout << buffer.size() << std::endl;
-			}
-			catch (std::exception &ex)
-			{
-				std::cout << ex.what() << std::endl;
-			}
+			handleFileUpload(client, msg, true);
 		}
 		break;
 
 		case CustomMsgTypes::UploadMore:
 		{
-			try
-			{
-				std::string out_path = "C:/Users/HBhutto/source/repos/Client_Server/Multi-Client-Server-ASIO/Server/FilesDatabase/" + std::to_string(client->getID());
-				//out_path = out_path + "/Hero.txt";
-				out_path = out_path + "/Client-Server-App.zip";
-
-				std::ofstream targetFile;
-				targetFile.open(out_path, std::ios_base::binary | std::ios_base::app);
-
-				std::vector<uint8_t> buffer(msg.size());
-				buffer = std::move(msg.body);
-
-				targetFile.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
-
-				std::cout << "[" << client->getID() << "]: ";
-				std::cout << buffer.size() << std::endl;
-			}
-			catch (std::exception& ex)
-			{
-				std::cout << ex.what() << std::endl;
-			}
+			handleFileUpload(client, msg, false);
 		}
 		break;
 
+		//case CustomMsgTypes::UploadLast:
+		//{
+		//	handleFileUpload(client, msg);
+		//}
+		//break;
+		}
 
+
+	}
+	
+	void handleFileUpload(std::shared_ptr<clsrv::net::connection<CustomMsgTypes>> client,
+		clsrv::net::message<CustomMsgTypes>& msg, bool firstChunk) {
+		std::scoped_lock lock(m_fileMutex);
+		try {
+			std::string out_path = "FilesDatabase/" + std::to_string(client->getID());
+
+			if (!std::filesystem::exists(out_path)) {
+				std::filesystem::create_directory(out_path);
+			}
+
+			//std::string file_path = out_path + "/Hero.txt";
+			std::string file_path = out_path + "/Client-Server-App.zip";
+
+			std::ios_base::openmode file_mode = std::ios_base::binary;
+
+
+		// Determine file open mode based on file existence
+			if (firstChunk)
+			{
+				file_mode |= std::ios_base::out;
+			}
+			else
+			{
+				file_mode |= std::ios_base::app;
+			}
+
+			m_targetFile.open(file_path, file_mode);
+			while (!m_targetFile.is_open()) {
+				m_targetFile.open(file_path, file_mode);
+			}
+
+			std::vector<uint8_t> buffer(msg.size());
+			buffer = std::move(msg.body);
+			msg.header.size = msg.size();
+
+			m_targetFile.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
+			m_targetFile.close();
+
+			std::cout << "[" << client->getID() << "]: ";
+			std::cout << buffer.size() << " bytes written to " << file_path << std::endl;
+		}
+		catch (std::exception& ex) {
+			std::cerr << ex.what() << std::endl;
 		}
 	}
-public:
-	void messageToClient()
-	{
-		clsrv::net::message<CustomMsgTypes> msg;
-		msg.header.id = CustomMsgTypes::ServerMessageToClient;
 
-		int id;
-		std::string messg;
-		std::cout << "Enter id of client: ";
-		std::cin >> id;
-
-		std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-
-		std::cout << "Enter message for client: ";
-		std::getline(std::cin, messg);
-
-		msg << messg;
-
-		for (auto& client : m_deqConnections)
+	public:
+		void messageToClient()
 		{
-			if (client && client->isConnected())
+			clsrv::net::message<CustomMsgTypes> msg;
+			msg.header.id = CustomMsgTypes::ServerMessageToClient;
+
+			int id;
+			std::string messg;
+			std::cout << "Enter id of client: ";
+			std::cin >> id;
+
+			std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+			std::cout << "Enter message for client: ";
+			std::getline(std::cin, messg);
+
+			msg << messg;
+
+			for (auto& client : m_deqConnections)
 			{
-				if (client->getID() == static_cast<uint32_t>(id))
+				if (client && client->isConnected())
 				{
-					messageClient(client, msg);
-					break;
+					if (client->getID() == static_cast<uint32_t>(id))
+					{
+						messageClient(client, msg);
+						break;
+					}
 				}
 			}
 		}
-	}
 
-	void messageToAllClients()
-	{
-		clsrv::net::message<CustomMsgTypes> msg;
-		msg.header.id = CustomMsgTypes::ServerMessageToClient;
+		void messageToAllClients()
+		{
+			clsrv::net::message<CustomMsgTypes> msg;
+			msg.header.id = CustomMsgTypes::ServerMessageToClient;
 
-		std::string messg;
+			std::string messg;
 
-		std::cout << "Enter message for all clients: ";
-		std::getline(std::cin, messg);
+			std::cout << "Enter message for all clients: ";
+			std::getline(std::cin, messg);
 
-		msg << messg;
+			msg << messg;
 
-		messageAllClients(msg);
-	}
+			messageAllClients(msg);
+		}
+
+	private:
+		std::mutex m_fileMutex;
+		std::ofstream m_targetFile;
 
 };
 
