@@ -73,35 +73,21 @@ public:
 		std::cout << "File size: " << fileSize << " bytes" << std::endl;
 
 		const size_t BUFFER_SIZE = 1024 * 1024;
-		//std::vector<uint8_t> buffer(BUFFER_SIZE);
-		std::vector<uint8_t> buffer(BUFFER_SIZE);
 
-		sourceFile.read(reinterpret_cast<char*>(buffer.data()), BUFFER_SIZE);
-
-		clsrv::net::message<CustomMsgTypes> fileUploadMsg;
-		fileUploadMsg.header.id = CustomMsgTypes::UploadFile;
-		fileUploadMsg.header.size = buffer.size();
-		fileUploadMsg.body = std::move(buffer);
-		send(fileUploadMsg);
-		fileUploadMsg.body.clear();
-
-		while (!sourceFile.eof()) 
-		{
-			std::cout << "Remaining bytes: " << fileSize - sourceFile.tellg() << std::endl;
-			bool checkForData = fileSize - sourceFile.tellg() < BUFFER_SIZE;
-			std::cout << checkForData << std::endl;
-			std::vector<uint8_t> buffer(BUFFER_SIZE);
-			sourceFile.read(reinterpret_cast<char*>(buffer.data()), BUFFER_SIZE);
+		bool isFirstChunk = true;
+		while (!sourceFile.eof() && fileSize > 0) {
+			size_t bytesToRead = std::min(static_cast<size_t>(fileSize), BUFFER_SIZE);
+			std::vector<uint8_t> buffer(bytesToRead);
+			sourceFile.read(reinterpret_cast<char*>(buffer.data()), bytesToRead);
 			clsrv::net::message<CustomMsgTypes> fileUploadMsg;
-			fileUploadMsg.header.id = CustomMsgTypes::UploadMore;
-			fileUploadMsg.header.size = checkForData ? fileSize - sourceFile.tellg() : buffer.size();
-			//fileUploadMsg.header.size = buffer.size();
-			fileUploadMsg.body = std::move(buffer);
+			fileUploadMsg.header.id = isFirstChunk ? CustomMsgTypes::UploadFile : CustomMsgTypes::UploadMore;
+			fileUploadMsg.header.size = bytesToRead;
+			fileUploadMsg.body.assign(buffer.begin(), buffer.begin() + bytesToRead);
 			send(fileUploadMsg);
-			fileUploadMsg.body.clear();
+			fileSize -= bytesToRead;
+			isFirstChunk = false;
+			std::cout << "Bytes remaining: " << fileSize << std::endl;
 		}
-
-		std::cout << sourceFile.tellg() << std::endl;
 
 		if (sourceFile.eof()) {
 			std::cout << "File read successfully" << std::endl;
@@ -109,9 +95,7 @@ public:
 		else if (sourceFile.fail()) {
 			std::cerr << "Failed while reading file" << std::endl;
 		}
-
 		sourceFile.close();
-
 	}
 
 	void downloadFile()
