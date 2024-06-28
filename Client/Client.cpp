@@ -11,7 +11,6 @@ public:
 		msg.header.id = CustomMsgTypes::ServerPing;
 		std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
 		msg << timeNow;
-		//std :: cout << msg << std::endl;
 		send(msg);
 	}
 
@@ -36,9 +35,11 @@ public:
 	void openFile()
 	{
 		//std::string in_path = "C:/Users/HBhutto/source/repos/Client_Server/Multi-Client-Server-ASIO/x64/Debug/Hero.txt";
-		std::string in_path = "C:/Users/HBhutto/source/repos/Client_Server/Versioning/Client-Server-App.zip";
-	/*	std::cout << "Enter path of file : " << std::endl;
-		std::getline(std::cin, in_path);*/
+		//std::string in_path = "C:/Users/HBhutto/source/repos/Client_Server/Versioning/Client-Server-App.zip";
+		std::string in_path = "C:/Users/HBhutto/source/repos/Client_Server/Versioning/Colttaine.zip";
+
+		/*	std::cout << "Enter path of file : " << std::endl;
+			std::getline(std::cin, in_path);*/
 
 		if (!fs::exists(in_path)) {
 			throw "File path does not exist.";
@@ -55,10 +56,10 @@ public:
 
 		//std::cout << "Hero" << std::endl;
 
-		uploadFile(sourceFile,fileName);
+		uploadFile(sourceFile, fileName);
 	}
 
-	void uploadFile(std::ifstream &sourceFile, std::string fileName)
+	void uploadFile(std::ifstream& sourceFile, std::string fileName)
 	{
 
 		if (!sourceFile.is_open()) {
@@ -72,7 +73,7 @@ public:
 
 		std::cout << "File size: " << fileSize << " bytes" << std::endl;
 
-		const size_t BUFFER_SIZE = 1024 * 1024;
+		const size_t BUFFER_SIZE = 1024 * 1024 * 10;
 
 		bool isFirstChunk = true;
 		while (!sourceFile.eof() && fileSize > 0) {
@@ -100,9 +101,54 @@ public:
 
 	void downloadFile()
 	{
-
+		clsrv::net::message<CustomMsgTypes> FileDownloadMsg;
+		FileDownloadMsg.header.id = CustomMsgTypes::DownloadFile;
+		std::string hero;
+		std::cout << "Enter File Name to Download From Server: ";
+		std::getline(std::cin, hero);
+		FileDownloadMsg << hero;
+		send(FileDownloadMsg);
+		m_fileName = hero;
 	}
 
+	void handleDownloadFile(clsrv::net::message<CustomMsgTypes>& msg, bool firstChunk)
+	{
+		try
+		{
+			std::string out_path = std::to_string(m_connection->getID()) + "/";
+
+			if (!std::filesystem::exists(out_path)) {
+				std::filesystem::create_directory(out_path);
+			}
+			std::string file_path = out_path + m_fileName;
+			std::ios_base::openmode file_mode = std::ios_base::binary;
+			// Determine file open mode based on file existence
+			if (firstChunk)
+				file_mode |= std::ios_base::out;
+			else
+				file_mode |= std::ios_base::app;
+
+			std::ofstream downloadFile(file_path, file_mode);
+			while (!downloadFile.is_open()) {
+				downloadFile.open(file_path, file_mode);
+			}
+
+			std::vector<uint8_t> buffer(msg.size());
+			buffer = std::move(msg.body);
+			msg.header.size = msg.size();
+			downloadFile.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
+			downloadFile.close();
+			std::cout << "[Server]: ";
+			std::cout << buffer.size() << " bytes written to " << file_path << std::endl;
+		}
+		catch (std::exception& ex) 
+		{
+			std::cerr << ex.what() << std::endl;
+		}
+	}
+
+	private:
+		std::string m_fileName;
 };
 
 int main()
@@ -115,7 +161,6 @@ int main()
 
 	HWND hwndForeground;
 	hwndForeground = GetForegroundWindow();
-
 	bool bQuit = false;
 	while (!bQuit)
 	{
@@ -180,6 +225,17 @@ int main()
 				}
 				break;
 
+				case CustomMsgTypes::DownloadFile:
+				{
+					c.handleDownloadFile(msg, true);
+				}
+				break;
+
+				case CustomMsgTypes::DownloadMore:
+				{
+					c.handleDownloadFile(msg, false);
+				}
+				break;
 				}
 			}
 		}
@@ -190,6 +246,5 @@ int main()
 		}
 
 	}
-
 	return 0;
 }
