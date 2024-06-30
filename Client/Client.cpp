@@ -32,14 +32,47 @@ public:
 		send(msg);
 	}
 
+	void sendFileName(std::string fileName)
+	{
+		clsrv::net::message<CustomMsgTypes> fileUploadMsg;
+		fileUploadMsg.header.id = CustomMsgTypes::UploadFileName;
+		fileUploadMsg << fileName;
+		send(fileUploadMsg);
+	}
+
+	void uploadFile()
+	{
+		std::string in_path;
+		in_path = clsrv::file::inputPath(in_path);
+		if (!clsrv::file::fileExists(in_path)) return;
+		std::string fileName = clsrv::file::extractFileName(in_path);
+		std::cout << "File name: " << fileName << std::endl;
+		std::ifstream sourceFile = clsrv::file::openReadFile(in_path, std::ios_base::binary | std::ios_base::ate);
+		size_t fileSize = clsrv::file::getFileSize(sourceFile);
+		std::cout << "File size: " << fileSize << " bytes" << std::endl;
+		sendFileName(fileName);
+		const size_t BUFFER_SIZE = 1024 * 1024 * 10;
+		bool isFirstChunk = true;
+		while (!sourceFile.eof() && fileSize > 0) {
+			std::vector<uint8_t> buffer = clsrv::file::readFile(sourceFile, fileSize, BUFFER_SIZE);
+			clsrv::net::message<CustomMsgTypes> fileUploadMsg;
+			fileUploadMsg.header.id = CustomMsgTypes::UploadChunk;
+			fileUploadMsg.header.size = clsrv::file::getBytesToRead(fileSize,BUFFER_SIZE);
+			fileUploadMsg.body.assign(buffer.begin(), buffer.begin() + clsrv::file::getBytesToRead(fileSize, BUFFER_SIZE));
+			send(fileUploadMsg);
+			fileSize -= clsrv::file::getBytesToRead(fileSize, BUFFER_SIZE);
+			isFirstChunk = false;
+			std::cout << "Bytes remaining: " << fileSize << std::endl;
+		}
+		clsrv::file::fileCompleted(sourceFile);
+		sourceFile.close();
+	}
+
 	void openFile()
 	{
 		//std::string in_path = "C:/Users/HBhutto/source/repos/Client_Server/Multi-Client-Server-ASIO/x64/Debug/Hero.txt";
 		//std::string in_path = "C:/Users/HBhutto/source/repos/Client_Server/Versioning/Client-Server-App.zip";
 		std::string in_path = "C:/Users/HBhutto/source/repos/Client_Server/Versioning/Colttaine.zip";
-
-		/*	std::cout << "Enter path of file : " << std::endl;
-			std::getline(std::cin, in_path);*/
 
 		if (!fs::exists(in_path)) {
 			throw "File path does not exist.";
@@ -81,7 +114,7 @@ public:
 			std::vector<uint8_t> buffer(bytesToRead);
 			sourceFile.read(reinterpret_cast<char*>(buffer.data()), bytesToRead);
 			clsrv::net::message<CustomMsgTypes> fileUploadMsg;
-			fileUploadMsg.header.id = isFirstChunk ? CustomMsgTypes::UploadFile : CustomMsgTypes::UploadMore;
+			fileUploadMsg.header.id = CustomMsgTypes::UploadChunk;
 			fileUploadMsg.header.size = bytesToRead;
 			fileUploadMsg.body.assign(buffer.begin(), buffer.begin() + bytesToRead);
 			send(fileUploadMsg);
@@ -102,7 +135,7 @@ public:
 	void downloadFile()
 	{
 		clsrv::net::message<CustomMsgTypes> FileDownloadMsg;
-		FileDownloadMsg.header.id = CustomMsgTypes::DownloadFile;
+		FileDownloadMsg.header.id = CustomMsgTypes::DownloadChunk;
 		std::string hero;
 		std::cout << "Enter File Name to Download From Server: ";
 		std::getline(std::cin, hero);
@@ -111,35 +144,21 @@ public:
 		m_fileName = hero;
 	}
 
-	void handleDownloadFile(clsrv::net::message<CustomMsgTypes>& msg, bool firstChunk)
+	void handleDownloadFile(clsrv::net::message<CustomMsgTypes>& msg)
 	{
 		try
 		{
-			std::string out_path = std::to_string(m_connection->getID()) + "/";
-
-			if (!std::filesystem::exists(out_path)) {
-				std::filesystem::create_directory(out_path);
-			}
-			std::string file_path = out_path + m_fileName;
-			std::ios_base::openmode file_mode = std::ios_base::binary;
-			// Determine file open mode based on file existence
-			if (firstChunk)
-				file_mode |= std::ios_base::out;
-			else
-				file_mode |= std::ios_base::app;
-
-			std::ofstream downloadFile(file_path, file_mode);
+			std::ofstream downloadFile(m_downloadPath, std::ios_base::binary | std::ios_base::app);
 			while (!downloadFile.is_open()) {
-				downloadFile.open(file_path, file_mode);
+				downloadFile.open(m_downloadPath, std::ios_base::binary | std::ios_base::app);
 			}
-
 			std::vector<uint8_t> buffer(msg.size());
 			buffer = std::move(msg.body);
 			msg.header.size = msg.size();
 			downloadFile.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
 			downloadFile.close();
 			std::cout << "[Server]: ";
-			std::cout << buffer.size() << " bytes written to " << file_path << std::endl;
+			std::cout << buffer.size() << " bytes written to " << m_downloadPath << std::endl;
 		}
 		catch (std::exception& ex) 
 		{
@@ -147,8 +166,20 @@ public:
 		}
 	}
 
+	void setDownloadPath(std::string path)
+	{
+		m_downloadPath = path;
+		std::cout << m_downloadPath << std::endl;
+	}
+
+	std::string getFileName()
+	{
+		return m_fileName;
+	}
+
 	private:
 		std::string m_fileName;
+		std::string m_downloadPath;
 };
 
 int main()
@@ -179,7 +210,7 @@ int main()
 		if (key[0] && !old_key[0]) c.pingServer();
 		if (key[1] && !old_key[1]) c.messageServer();
 		if (key[2] && !old_key[2]) c.messageAll();
-		if (key[3] && !old_key[3]) c.openFile();
+		if (key[3] && !old_key[3]) c.uploadFile();
 		if (key[4] && !old_key[4]) c.downloadFile();
 		if (key[5] && !old_key[5]) bQuit = true;
 
@@ -225,15 +256,29 @@ int main()
 				}
 				break;
 
-				case CustomMsgTypes::DownloadFile:
+				case CustomMsgTypes::DownloadFilePath:
 				{
-					c.handleDownloadFile(msg, true);
+					std::string downloadPath;
+					msg >> downloadPath;
+					try
+					{
+						if (!std::filesystem::exists(downloadPath)) {
+							std::filesystem::create_directory(downloadPath);
+						}
+						downloadPath += "/" + c.getFileName();
+						clsrv::file::openWriteFile(downloadPath, std::ios_base::binary | std::ios_base::out);
+						c.setDownloadPath(downloadPath);
+					}
+					catch (std::exception& ex)
+					{
+						std::cerr << ex.what() << std::endl;
+					}
 				}
 				break;
 
-				case CustomMsgTypes::DownloadMore:
+				case CustomMsgTypes::DownloadChunk:
 				{
-					c.handleDownloadFile(msg, false);
+					c.handleDownloadFile(msg);
 				}
 				break;
 				}

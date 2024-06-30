@@ -10,9 +10,8 @@ enum class CustomMsgTypes : uint32_t
 	MessageAll,
 	ServerMessage,
 	ServerMessageToClient,
-	UploadFile,
-	UploadMore,
-	//UploadLast,
-	DownloadFile,
-	DownloadMore
+	UploadFileName,
+	UploadChunk,
+	DownloadFilePath,
+	DownloadChunk,
 };
