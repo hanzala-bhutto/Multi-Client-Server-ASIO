@@ -79,7 +79,6 @@ namespace clsrv
 
 				return msg;
 			}
-
 		};
 
 		template <typename T>

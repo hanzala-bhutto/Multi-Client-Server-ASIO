@@ -2,17 +2,6 @@
 #include <iostream>
 #include <clsrv_net.h>
 
-enum class CustomMsgTypes : uint32_t
-{
-	ServerAccept,
-	ServerDeny,
-	ServerPing,
-	MessageServer,
-	MessageAll,
-	ServerMessage,
-	ServerMessageToClient,
-};
-
 class CustomClient : public clsrv::net::ClientInterface<CustomMsgTypes>
 {
 public:
@@ -22,7 +11,6 @@ public:
 		msg.header.id = CustomMsgTypes::ServerPing;
 		std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
 		msg << timeNow;
-		//std :: cout << msg << std::endl;
 		send(msg);
 	}
 
@@ -43,6 +31,124 @@ public:
 		msg.header.id = CustomMsgTypes::MessageAll;
 		send(msg);
 	}
+
+	void openFile()
+	{
+		//std::string in_path = "C:/Users/HBhutto/source/repos/Client_Server/Multi-Client-Server-ASIO/x64/Debug/Hero.txt";
+		//std::string in_path = "C:/Users/HBhutto/source/repos/Client_Server/Versioning/Client-Server-App.zip";
+		std::string in_path = "C:/Users/HBhutto/source/repos/Client_Server/Versioning/Colttaine.zip";
+
+		/*	std::cout << "Enter path of file : " << std::endl;
+			std::getline(std::cin, in_path);*/
+
+		if (!fs::exists(in_path)) {
+			throw "File path does not exist.";
+		}
+
+		// Extract the file name
+		std::string fileName = fs::path(in_path).filename().string();
+		std::cout << "File name: " << fileName << std::endl;
+
+		std::ifstream sourceFile;
+		sourceFile.open(in_path, std::ios_base::binary | std::ios_base::ate);
+		if (sourceFile.fail())
+			throw std::fstream::failure("Failed while opening file " + in_path);
+
+		//std::cout << "Hero" << std::endl;
+
+		uploadFile(sourceFile, fileName);
+	}
+
+	void uploadFile(std::ifstream& sourceFile, std::string fileName)
+	{
+
+		if (!sourceFile.is_open()) {
+			std::cerr << "File is not open!" << std::endl;
+			return;
+		}
+
+		sourceFile.seekg(0, sourceFile.end);
+		auto fileSize = sourceFile.tellg();
+		sourceFile.seekg(0, sourceFile.beg);
+
+		std::cout << "File size: " << fileSize << " bytes" << std::endl;
+
+		const size_t BUFFER_SIZE = 1024 * 1024 * 10;
+
+		bool isFirstChunk = true;
+		while (!sourceFile.eof() && fileSize > 0) {
+			size_t bytesToRead = std::min(static_cast<size_t>(fileSize), BUFFER_SIZE);
+			std::vector<uint8_t> buffer(bytesToRead);
+			sourceFile.read(reinterpret_cast<char*>(buffer.data()), bytesToRead);
+			clsrv::net::message<CustomMsgTypes> fileUploadMsg;
+			fileUploadMsg.header.id = isFirstChunk ? CustomMsgTypes::UploadFile : CustomMsgTypes::UploadMore;
+			fileUploadMsg.header.size = bytesToRead;
+			fileUploadMsg.body.assign(buffer.begin(), buffer.begin() + bytesToRead);
+			send(fileUploadMsg);
+			fileSize -= bytesToRead;
+			isFirstChunk = false;
+			std::cout << "Bytes remaining: " << fileSize << std::endl;
+		}
+
+		if (sourceFile.eof()) {
+			std::cout << "File read successfully" << std::endl;
+		}
+		else if (sourceFile.fail()) {
+			std::cerr << "Failed while reading file" << std::endl;
+		}
+		sourceFile.close();
+	}
+
+	void downloadFile()
+	{
+		clsrv::net::message<CustomMsgTypes> FileDownloadMsg;
+		FileDownloadMsg.header.id = CustomMsgTypes::DownloadFile;
+		std::string hero;
+		std::cout << "Enter File Name to Download From Server: ";
+		std::getline(std::cin, hero);
+		FileDownloadMsg << hero;
+		send(FileDownloadMsg);
+		m_fileName = hero;
+	}
+
+	void handleDownloadFile(clsrv::net::message<CustomMsgTypes>& msg, bool firstChunk)
+	{
+		try
+		{
+			std::string out_path = std::to_string(m_connection->getID()) + "/";
+
+			if (!std::filesystem::exists(out_path)) {
+				std::filesystem::create_directory(out_path);
+			}
+			std::string file_path = out_path + m_fileName;
+			std::ios_base::openmode file_mode = std::ios_base::binary;
+			// Determine file open mode based on file existence
+			if (firstChunk)
+				file_mode |= std::ios_base::out;
+			else
+				file_mode |= std::ios_base::app;
+
+			std::ofstream downloadFile(file_path, file_mode);
+			while (!downloadFile.is_open()) {
+				downloadFile.open(file_path, file_mode);
+			}
+
+			std::vector<uint8_t> buffer(msg.size());
+			buffer = std::move(msg.body);
+			msg.header.size = msg.size();
+			downloadFile.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
+			downloadFile.close();
+			std::cout << "[Server]: ";
+			std::cout << buffer.size() << " bytes written to " << file_path << std::endl;
+		}
+		catch (std::exception& ex) 
+		{
+			std::cerr << ex.what() << std::endl;
+		}
+	}
+
+	private:
+		std::string m_fileName;
 };
 
 int main()
@@ -50,12 +156,11 @@ int main()
 	CustomClient c;
 	c.connect("127.0.0.1", 6000);
 
-	bool key[4] = { false, false, false, false };
-	bool old_key[4] = { false, false, false, false };
+	bool key[6] = { false, false, false, false , false, false };
+	bool old_key[6] = { false, false, false, false, false, false };
 
 	HWND hwndForeground;
 	hwndForeground = GetForegroundWindow();
-
 	bool bQuit = false;
 	while (!bQuit)
 	{
@@ -67,14 +172,18 @@ int main()
 			key[1] = GetAsyncKeyState('2') & 0x8000;
 			key[2] = GetAsyncKeyState('3') & 0x8000;
 			key[3] = GetAsyncKeyState('4') & 0x8000;
+			key[4] = GetAsyncKeyState('5') & 0x8000;
+			key[5] = GetAsyncKeyState('6') & 0x8000;
 		}
 
 		if (key[0] && !old_key[0]) c.pingServer();
 		if (key[1] && !old_key[1]) c.messageServer();
 		if (key[2] && !old_key[2]) c.messageAll();
-		if (key[3] && !old_key[3]) bQuit = true;
+		if (key[3] && !old_key[3]) c.openFile();
+		if (key[4] && !old_key[4]) c.downloadFile();
+		if (key[5] && !old_key[5]) bQuit = true;
 
-		for (int i = 0; i < 3; i++) old_key[i] = key[i];
+		for (int i = 0; i < 6; i++) old_key[i] = key[i];
 
 		if (c.isConnected())
 		{
@@ -115,6 +224,18 @@ int main()
 					std::cout << "[SERVER said]: " << message << "\n";
 				}
 				break;
+
+				case CustomMsgTypes::DownloadFile:
+				{
+					c.handleDownloadFile(msg, true);
+				}
+				break;
+
+				case CustomMsgTypes::DownloadMore:
+				{
+					c.handleDownloadFile(msg, false);
+				}
+				break;
 				}
 			}
 		}
@@ -125,6 +246,5 @@ int main()
 		}
 
 	}
-
 	return 0;
 }
