@@ -53,19 +53,36 @@ protected:
 		}
 		break;
 
-		case CustomMsgTypes::UploadFile:
+		case CustomMsgTypes::UploadFileName:
 		{
-			handleFileUpload(client, msg, true);
+			std::string fileName;
+			msg >> fileName;
+
+			try
+			{
+				std::string out_path = "FilesDatabase/" + std::to_string(client->getID());
+
+				if (!std::filesystem::exists(out_path)) {
+					std::filesystem::create_directory(out_path);
+				}
+				out_path += "/" + fileName;
+				m_clientFiles[client->getID()] = fileName;
+				clsrv::file::openWriteFile(out_path, std::ios_base::binary | std::ios_base::out);
+			}
+			catch (std::exception& ex)
+			{
+				std::cerr << ex.what() << std::endl;
+			}
 		}
 		break;
 
-		case CustomMsgTypes::UploadMore:
+		case CustomMsgTypes::UploadChunk:
 		{
-			handleFileUpload(client, msg, false);
+			handleFileUpload(client, msg);
 		}
 		break;
 
-		case CustomMsgTypes::DownloadFile:
+		case CustomMsgTypes::DownloadChunk:
 		{
 			handleFileDownloadAsync(client,msg);
 		}
@@ -74,46 +91,22 @@ protected:
 	}
 	
 	void handleFileUpload(std::shared_ptr<clsrv::net::connection<CustomMsgTypes>> client,
-		clsrv::net::message<CustomMsgTypes>& msg, bool firstChunk) {
+		clsrv::net::message<CustomMsgTypes>& msg) {
 		std::scoped_lock lock(m_fileMutex);
 		try 
 		{
-			std::string out_path = "FilesDatabase/" + std::to_string(client->getID());
-
-			if (!std::filesystem::exists(out_path)) {
-				std::filesystem::create_directory(out_path);
-			}
-			//std::string file_path = out_path + "/Hero.txt";
-			std::string file_path = out_path + "/Colttaine.zip";
-			//std::string file_path = out_path + "/Client-Server-App.zip";
-
-			std::ios_base::openmode file_mode = std::ios_base::binary;
-
-
-		// Determine file open mode based on file existence
-			if (firstChunk)
-			{
-				file_mode |= std::ios_base::out;
-			}
-			else
-			{
-				file_mode |= std::ios_base::app;
-			}
-
-			m_targetFile.open(file_path, file_mode);
+			std::string out_path = "FilesDatabase/" + std::to_string(client->getID()) + "/" + m_clientFiles[client->getID()];
+			m_targetFile.open(out_path, std::ios_base::binary | std::ios_base::app);
 			while (!m_targetFile.is_open()) {
-				m_targetFile.open(file_path, file_mode);
+				m_targetFile.open(out_path, std::ios_base::binary | std::ios_base::app);
 			}
-
 			std::vector<uint8_t> buffer(msg.size());
 			buffer = std::move(msg.body);
 			msg.header.size = msg.size();
-
 			m_targetFile.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
 			m_targetFile.close();
-
 			std::cout << "[" << client->getID() << "]: ";
-			std::cout << buffer.size() << " bytes written to " << file_path << std::endl;
+			std::cout << buffer.size() << " bytes written to " << out_path << std::endl;
 		}
 		catch (std::exception& ex) 
 		{
@@ -121,14 +114,8 @@ protected:
 		}
 	}
 
-	void handleFileDownloadAsync(std::shared_ptr<clsrv::net::connection<CustomMsgTypes>> client,
-		clsrv::net::message<CustomMsgTypes> msg)
-		{
-		std::string fileName;
-		msg >> fileName;
-		std::string file_path = "FilesDatabase/" + std::to_string(client->getID()) + "/" + fileName;
-		std::cout << file_path << std::endl;
-
+	bool fileNotFound(std::shared_ptr<clsrv::net::connection<CustomMsgTypes>> client,std::string file_path)
+	{
 		if (!std::filesystem::exists(file_path))
 		{
 			clsrv::net::message<CustomMsgTypes> msg;
@@ -136,47 +123,51 @@ protected:
 			std::string message = "The File You Requested Does not Exist";
 			msg << message;
 			messageClient(client, msg);
-			return;
+			return true;
 		}
+		return false;
+	}
 
-		std::thread downloadThread([this, client, file_path]() {
+	void sendDownloadPath(std::shared_ptr<clsrv::net::connection<CustomMsgTypes>> client, std::string fileName)
+	{
+		std::string downloadPath = std::to_string(client->getID());
+		clsrv::net::message<CustomMsgTypes> fileUploadMsg;
+		fileUploadMsg.header.id = CustomMsgTypes::DownloadFilePath;
+		fileUploadMsg << downloadPath;
+		messageClient(client,fileUploadMsg);
+	}
+
+	void handleFileDownloadAsync(std::shared_ptr<clsrv::net::connection<CustomMsgTypes>> client,
+		clsrv::net::message<CustomMsgTypes> msg)
+		{
+		std::string fileName;
+		msg >> fileName;
+		std::string filePath = "FilesDatabase/" + std::to_string(client->getID()) + "/" + fileName;
+		std::cout << filePath << std::endl;
+
+		if (fileNotFound(client,filePath)) return;
+		sendDownloadPath(client, fileName);
+
+		std::thread downloadThread([this, client, filePath]() {
 			try
 			{
-				std::ifstream sourceFile;
-				sourceFile.open(file_path, std::ios_base::binary | std::ios_base::ate);
-				if (!sourceFile.is_open())
-				{
-					std::cerr << "File is not open!" << std::endl;
-					return;
-				}
-
-				sourceFile.seekg(0, sourceFile.end);
-				auto fileSize = sourceFile.tellg();
-				sourceFile.seekg(0, sourceFile.beg);
+				std::ifstream sourceFile = clsrv::file::openReadFile(filePath, std::ios_base::binary | std::ios_base::ate);
+				size_t fileSize = clsrv::file::getFileSize(sourceFile);
 				std::cout << "File size: " << fileSize << " bytes" << std::endl;
-
 				const size_t BUFFER_SIZE = 1024 * 1024 * 10;
 				bool isFirstChunk = true;
 				while (!sourceFile.eof() && fileSize > 0) {
-					size_t bytesToRead = std::min(static_cast<size_t>(fileSize), BUFFER_SIZE);
-					std::vector<uint8_t> buffer(bytesToRead);
-					sourceFile.read(reinterpret_cast<char*>(buffer.data()), bytesToRead);
+					std::vector<uint8_t> buffer = clsrv::file::readFile(sourceFile, fileSize, BUFFER_SIZE);
 					clsrv::net::message<CustomMsgTypes> fileUploadMsg;
-					fileUploadMsg.header.id = isFirstChunk ? CustomMsgTypes::DownloadFile : CustomMsgTypes::DownloadMore;
-					fileUploadMsg.header.size = bytesToRead;
-					fileUploadMsg.body.assign(buffer.begin(), buffer.begin() + bytesToRead);
+					fileUploadMsg.header.id = CustomMsgTypes::DownloadChunk;
+					fileUploadMsg.header.size = clsrv::file::getBytesToRead(fileSize, BUFFER_SIZE);
+					fileUploadMsg.body.assign(buffer.begin(), buffer.begin() + clsrv::file::getBytesToRead(fileSize, BUFFER_SIZE));
 					messageClient(client, fileUploadMsg);
-					fileSize -= bytesToRead;
+					fileSize -= clsrv::file::getBytesToRead(fileSize, BUFFER_SIZE);
 					isFirstChunk = false;
 					std::cout << "Bytes remaining: " << fileSize << std::endl;
 				}
-
-				if (sourceFile.eof()) {
-					std::cout << "File read successfully" << std::endl;
-				}
-				else if (sourceFile.fail()) {
-					std::cerr << "Failed while reading file" << std::endl;
-				}
+				clsrv::file::fileCompleted(sourceFile);
 				sourceFile.close();
 			}
 			catch (std::exception& ex)
@@ -235,6 +226,7 @@ protected:
 	private:
 		std::mutex m_fileMutex;
 		std::ofstream m_targetFile;
+		std::unordered_map<int, std::string> m_clientFiles;
 };
 
 int main()
