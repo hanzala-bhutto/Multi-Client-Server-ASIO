@@ -7,169 +7,107 @@ class CustomClient : public clsrv::net::ClientInterface<CustomMsgTypes>
 public:
 	void pingServer()
 	{
-		clsrv::net::message<CustomMsgTypes> msg;
-		msg.header.id = CustomMsgTypes::ServerPing;
-		std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
+		clsrv::net::Message<CustomMsgTypes> msg;
+		msg.header.m_nid = CustomMsgTypes::ServerPing;
+		chrono::system_clock::time_point timeNow = chrono::system_clock::now();
 		msg << timeNow;
 		send(msg);
 	}
 
 	void messageServer()
 	{
-		clsrv::net::message<CustomMsgTypes> msg;
-		msg.header.id = CustomMsgTypes::MessageServer;
-		std::string hero;
-		std::cout << "Enter message to send to server: ";
-		std::getline(std::cin, hero);
+		clsrv::net::Message<CustomMsgTypes> msg;
+		msg.header.m_nid = CustomMsgTypes::MessageServer;
+		string hero;
+		cout << "Enter message to send to server: ";
+		getline(cin, hero);
 		msg << hero;
 		send(msg);
 	}
 
 	void messageAll()
 	{
-		clsrv::net::message<CustomMsgTypes> msg;
-		msg.header.id = CustomMsgTypes::MessageAll;
+		clsrv::net::Message<CustomMsgTypes> msg;
+		msg.header.m_nid = CustomMsgTypes::MessageAll;
 		send(msg);
 	}
 
-	void sendFileName(std::string fileName)
+	void sendUploadFileName(std::string fileName)
 	{
-		clsrv::net::message<CustomMsgTypes> fileUploadMsg;
-		fileUploadMsg.header.id = CustomMsgTypes::UploadFileName;
+		clsrv::net::Message<CustomMsgTypes> fileUploadMsg;
+		fileUploadMsg.header.m_nid = CustomMsgTypes::UploadFileName;
 		fileUploadMsg << fileName;
 		send(fileUploadMsg);
 	}
 
+
 	void uploadFile()
 	{
-		std::string in_path;
+		string in_path;
 		in_path = clsrv::file::inputPath(in_path);
 		if (!clsrv::file::fileExists(in_path)) return;
-		std::string fileName = clsrv::file::extractFileName(in_path);
-		std::cout << "File name: " << fileName << std::endl;
-		std::ifstream sourceFile = clsrv::file::openReadFile(in_path, std::ios_base::binary | std::ios_base::ate);
+		string fileName = clsrv::file::extractFileName(in_path);
+		cout << "File name: " << fileName << endl;
+		ifstream sourceFile = clsrv::file::openReadFile(in_path, ios_base::binary | ios_base::ate);
 		size_t fileSize = clsrv::file::getFileSize(sourceFile);
-		std::cout << "File size: " << fileSize << " bytes" << std::endl;
-		sendFileName(fileName);
-		const size_t BUFFER_SIZE = 1024 * 1024 * 10;
-		bool isFirstChunk = true;
+		cout << "File size: " << fileSize << " bytes" << endl;
+		sendUploadFileName(fileName);
+		const size_t BUFFER_SIZE = clsrv::file::calculateChunkSize(fileSize);
+		cout << "Sending File in Chunks of " << BUFFER_SIZE << " bytes" << endl;
 		while (!sourceFile.eof() && fileSize > 0) {
-			std::vector<uint8_t> buffer = clsrv::file::readFile(sourceFile, fileSize, BUFFER_SIZE);
-			clsrv::net::message<CustomMsgTypes> fileUploadMsg;
-			fileUploadMsg.header.id = CustomMsgTypes::UploadChunk;
-			fileUploadMsg.header.size = clsrv::file::getBytesToRead(fileSize,BUFFER_SIZE);
-			fileUploadMsg.body.assign(buffer.begin(), buffer.begin() + clsrv::file::getBytesToRead(fileSize, BUFFER_SIZE));
-			send(fileUploadMsg);
-			fileSize -= clsrv::file::getBytesToRead(fileSize, BUFFER_SIZE);
-			isFirstChunk = false;
-			std::cout << "Bytes remaining: " << fileSize << std::endl;
-		}
-		clsrv::file::fileCompleted(sourceFile);
-		sourceFile.close();
-	}
-
-	void openFile()
-	{
-		//std::string in_path = "C:/Users/HBhutto/source/repos/Client_Server/Multi-Client-Server-ASIO/x64/Debug/Hero.txt";
-		//std::string in_path = "C:/Users/HBhutto/source/repos/Client_Server/Versioning/Client-Server-App.zip";
-		std::string in_path = "C:/Users/HBhutto/source/repos/Client_Server/Versioning/Colttaine.zip";
-
-		if (!fs::exists(in_path)) {
-			throw "File path does not exist.";
-		}
-
-		// Extract the file name
-		std::string fileName = fs::path(in_path).filename().string();
-		std::cout << "File name: " << fileName << std::endl;
-
-		std::ifstream sourceFile;
-		sourceFile.open(in_path, std::ios_base::binary | std::ios_base::ate);
-		if (sourceFile.fail())
-			throw std::fstream::failure("Failed while opening file " + in_path);
-
-		//std::cout << "Hero" << std::endl;
-
-		uploadFile(sourceFile, fileName);
-	}
-
-	void uploadFile(std::ifstream& sourceFile, std::string fileName)
-	{
-
-		if (!sourceFile.is_open()) {
-			std::cerr << "File is not open!" << std::endl;
-			return;
-		}
-
-		sourceFile.seekg(0, sourceFile.end);
-		auto fileSize = sourceFile.tellg();
-		sourceFile.seekg(0, sourceFile.beg);
-
-		std::cout << "File size: " << fileSize << " bytes" << std::endl;
-
-		const size_t BUFFER_SIZE = 1024 * 1024 * 10;
-
-		bool isFirstChunk = true;
-		while (!sourceFile.eof() && fileSize > 0) {
-			size_t bytesToRead = std::min(static_cast<size_t>(fileSize), BUFFER_SIZE);
-			std::vector<uint8_t> buffer(bytesToRead);
-			sourceFile.read(reinterpret_cast<char*>(buffer.data()), bytesToRead);
-			clsrv::net::message<CustomMsgTypes> fileUploadMsg;
-			fileUploadMsg.header.id = CustomMsgTypes::UploadChunk;
-			fileUploadMsg.header.size = bytesToRead;
+			vector<uint8_t> buffer = clsrv::file::readFile(sourceFile, fileSize, BUFFER_SIZE);
+			auto bytesToRead = clsrv::file::getBytesToRead(fileSize, BUFFER_SIZE);
+			clsrv::net::Message<CustomMsgTypes> fileUploadMsg;
+			fileUploadMsg.header.m_nid = CustomMsgTypes::UploadChunk;
+			fileUploadMsg.header.m_nsize = bytesToRead;
 			fileUploadMsg.body.assign(buffer.begin(), buffer.begin() + bytesToRead);
 			send(fileUploadMsg);
 			fileSize -= bytesToRead;
-			isFirstChunk = false;
-			std::cout << "Bytes remaining: " << fileSize << std::endl;
+			std::cout << "\rBytes remaining: " << fileSize << flush;
 		}
-
-		if (sourceFile.eof()) {
-			std::cout << "File read successfully" << std::endl;
-		}
-		else if (sourceFile.fail()) {
-			std::cerr << "Failed while reading file" << std::endl;
-		}
+		cout << flush << endl;
+		clsrv::file::fileCompleted(sourceFile);
 		sourceFile.close();
 	}
 
 	void downloadFile()
 	{
-		clsrv::net::message<CustomMsgTypes> FileDownloadMsg;
-		FileDownloadMsg.header.id = CustomMsgTypes::DownloadChunk;
-		std::string hero;
-		std::cout << "Enter File Name to Download From Server: ";
-		std::getline(std::cin, hero);
+		clsrv::net::Message<CustomMsgTypes> FileDownloadMsg;
+		FileDownloadMsg.header.m_nid = CustomMsgTypes::DownloadChunk;
+		string hero;
+		cout << "Enter File Name to Download From Server: ";
+		getline(std::cin, hero);
 		FileDownloadMsg << hero;
 		send(FileDownloadMsg);
 		m_fileName = hero;
 	}
 
-	void handleDownloadFile(clsrv::net::message<CustomMsgTypes>& msg)
+	void handleDownloadFile(clsrv::net::Message<CustomMsgTypes>& msg)
 	{
 		try
 		{
-			std::ofstream downloadFile(m_downloadPath, std::ios_base::binary | std::ios_base::app);
-			while (!downloadFile.is_open()) {
-				downloadFile.open(m_downloadPath, std::ios_base::binary | std::ios_base::app);
+			ofstream downloadFile(m_downloadPath, ios_base::binary | ios_base::app);
+			while (!downloadFile.is_open()) 
+			{
+				downloadFile.open(m_downloadPath, ios_base::binary | ios_base::app);
 			}
-			std::vector<uint8_t> buffer(msg.size());
-			buffer = std::move(msg.body);
-			msg.header.size = msg.size();
+			vector<uint8_t> buffer(msg.size());
+			buffer = move(msg.body);
+			msg.header.m_nsize = msg.size();
 			downloadFile.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
 			downloadFile.close();
-			std::cout << "[Server]: ";
-			std::cout << buffer.size() << " bytes written to " << m_downloadPath << std::endl;
+			cout << "\r[Server]: " << buffer.size() << " bytes written to " << m_downloadPath << std::flush;
 		}
-		catch (std::exception& ex) 
+		catch (exception& ex) 
 		{
-			std::cerr << ex.what() << std::endl;
+			cerr << ex.what() << endl;
 		}
 	}
 
 	void setDownloadPath(std::string path)
 	{
 		m_downloadPath = path;
-		std::cout << m_downloadPath << std::endl;
+		//cout << m_downloadPath << endl;
 	}
 
 	std::string getFileName()
@@ -178,8 +116,8 @@ public:
 	}
 
 	private:
-		std::string m_fileName;
-		std::string m_downloadPath;
+		string m_fileName;
+		string m_downloadPath;
 };
 
 int main()
@@ -222,21 +160,21 @@ int main()
 			{
 				auto msg = c.incoming().pop_front().msg;
 
-				switch (msg.header.id)
+				switch (msg.header.m_nid)
 				{
 				case CustomMsgTypes::ServerAccept:
 				{
-					std::cout << "Server Accepted Connection\n";
+					cout << "Server Accepted Connection\n";
 				}
 				break;
 
 
 				case CustomMsgTypes::ServerPing:
 				{
-					std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
-					std::chrono::system_clock::time_point timeThen;
+					chrono::system_clock::time_point timeNow = chrono::system_clock::now();
+					chrono::system_clock::time_point timeThen;
 					msg >> timeThen;
-					std::cout << "Ping: " << std::chrono::duration<double>(timeNow - timeThen).count() << "\n";
+					cout << "Ping: " << chrono::duration<double>(timeNow - timeThen).count() << "\n";
 				}
 				break;
 
@@ -244,34 +182,35 @@ int main()
 				{
 					uint32_t clientID;
 					msg >> clientID;
-					std::cout << "Hello from [" << clientID << "]\n";
+					cout << "Hello from [" << clientID << "]\n";
 				}
 				break;
 
 				case CustomMsgTypes::ServerMessageToClient:
 				{
-					std::string message;
+					string message;
 					msg >> message;
-					std::cout << "[SERVER said]: " << message << "\n";
+					cout << "[SERVER said]: " << message << "\n";
 				}
 				break;
 
 				case CustomMsgTypes::DownloadFilePath:
 				{
-					std::string downloadPath;
+					string downloadPath;
 					msg >> downloadPath;
+					downloadPath = "ClientFiles/" + downloadPath;
 					try
 					{
-						if (!std::filesystem::exists(downloadPath)) {
-							std::filesystem::create_directory(downloadPath);
+						if (!fs::exists(downloadPath)) {
+							fs::create_directories(downloadPath);
 						}
 						downloadPath += "/" + c.getFileName();
-						clsrv::file::openWriteFile(downloadPath, std::ios_base::binary | std::ios_base::out);
+						clsrv::file::openWriteFile(downloadPath, ios_base::binary | ios_base::out);
 						c.setDownloadPath(downloadPath);
 					}
 					catch (std::exception& ex)
 					{
-						std::cerr << ex.what() << std::endl;
+						cerr << ex.what() << std::endl;
 					}
 				}
 				break;
@@ -286,7 +225,7 @@ int main()
 		}
 		else
 		{
-			std::cout << "Server Down\n";
+			cout << "Server Down\n";
 			bQuit = true;
 		}
 
