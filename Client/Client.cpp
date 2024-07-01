@@ -32,7 +32,7 @@ public:
 		send(msg);
 	}
 
-	void sendUploadFileName(std::string fileName)
+	void sendFileInfo(std::string fileName)
 	{
 		clsrv::net::Message<CustomMsgTypes> fileUploadMsg;
 		fileUploadMsg.header.m_nid = CustomMsgTypes::UploadFileName;
@@ -51,7 +51,7 @@ public:
 		ifstream sourceFile = clsrv::file::openReadFile(in_path, ios_base::binary | ios_base::ate);
 		size_t fileSize = clsrv::file::getFileSize(sourceFile);
 		cout << "File size: " << fileSize << " bytes" << endl;
-		sendUploadFileName(fileName);
+		sendFileInfo(fileName);
 		const size_t BUFFER_SIZE = clsrv::file::calculateChunkSize(fileSize);
 		cout << "Sending File in Chunks of " << BUFFER_SIZE << " bytes" << endl;
 		while (!sourceFile.eof() && fileSize > 0) {
