@@ -153,7 +153,8 @@ protected:
 			{
 				std::ifstream sourceFile = clsrv::file::openReadFile(filePath, std::ios_base::binary | std::ios_base::ate);
 				size_t fileSize = clsrv::file::getFileSize(sourceFile);
-				std::cout << "File size: " << fileSize << " bytes" << std::endl;
+				std::cout << "File name: " << clsrv::file::extractFileName(filePath) << std::endl;
+ 				std::cout << "File size: " << fileSize << " bytes" << std::endl;
 				const size_t BUFFER_SIZE = 1024 * 1024 * 10;
 				bool isFirstChunk = true;
 				while (!sourceFile.eof() && fileSize > 0) {
