@@ -18,28 +18,35 @@ public:
 	{
 		clsrv::net::Message<CustomMsgTypes> msg;
 		msg.header.m_nid = CustomMsgTypes::MessageServer;
-		string hero;
+		string message;
 		cout << "Enter message to send to server: ";
-		getline(cin, hero);
-		msg << hero;
+		getline(cin, message);
+		msg << message;
 		send(msg);
 	}
 
-	void messageAll()
+	void publish()
 	{
 		clsrv::net::Message<CustomMsgTypes> msg;
-		msg.header.m_nid = CustomMsgTypes::MessageAll;
+		msg.header.m_nid = CustomMsgTypes::Publish;
 		send(msg);
+	}
+
+	void sendEndFileMsg()
+	{
+		clsrv::net::Message<CustomMsgTypes> fileCloseMsg;
+		fileCloseMsg.header.m_nid = CustomMsgTypes::FileEnd;
+		fileCloseMsg << "File Successfully Sent";
+		send(fileCloseMsg);
 	}
 
 	void sendFileInfo(std::string fileName)
 	{
 		clsrv::net::Message<CustomMsgTypes> fileUploadMsg;
-		fileUploadMsg.header.m_nid = CustomMsgTypes::UploadFileName;
+		fileUploadMsg.header.m_nid = CustomMsgTypes::UploadFileInfo;
 		fileUploadMsg << fileName;
 		send(fileUploadMsg);
 	}
-
 
 	void uploadFile()
 	{
@@ -53,7 +60,7 @@ public:
 		cout << "File size: " << fileSize << " bytes" << endl;
 		sendFileInfo(fileName);
 		const size_t BUFFER_SIZE = clsrv::file::calculateChunkSize(fileSize);
-		cout << "Sending File in Chunks of " << BUFFER_SIZE << " bytes" << endl;
+		cout << "Sending File in Chunks of " << clsrv::file::getBytesToRead(fileSize, BUFFER_SIZE) << " bytes" << endl;
 		while (!sourceFile.eof() && fileSize > 0) {
 			vector<uint8_t> buffer = clsrv::file::readFile(sourceFile, fileSize, BUFFER_SIZE);
 			auto bytesToRead = clsrv::file::getBytesToRead(fileSize, BUFFER_SIZE);
@@ -65,8 +72,9 @@ public:
 			fileSize -= bytesToRead;
 			std::cout << "\rBytes remaining: " << fileSize << flush;
 		}
-		cout << flush << endl;
+		cout << "\rBytes remaining: " << fileSize << "          " << endl;
 		clsrv::file::fileCompleted(sourceFile);
+		sendEndFileMsg();
 		sourceFile.close();
 	}
 
@@ -82,32 +90,23 @@ public:
 		m_fileName = hero;
 	}
 
-	void handleDownloadFile(clsrv::net::Message<CustomMsgTypes>& msg)
+	void handleFileDownload(clsrv::net::Message<CustomMsgTypes>& msg)
 	{
-		try
+		ofstream file(m_downloadPath, ios::binary | ios::app);
+		while (!file.is_open())
+			file.open(m_downloadPath, ios::binary | ios::app);
+		const std::vector<uint8_t>& fileData = std::move(msg.body);
+		if (file)
 		{
-			ofstream downloadFile(m_downloadPath, ios_base::binary | ios_base::app);
-			while (!downloadFile.is_open()) 
-			{
-				downloadFile.open(m_downloadPath, ios_base::binary | ios_base::app);
-			}
-			vector<uint8_t> buffer(msg.size());
-			buffer = move(msg.body);
-			msg.header.m_nsize = msg.size();
-			downloadFile.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
-			downloadFile.close();
-			cout << "\r[Server]: " << buffer.size() << " bytes written to " << m_downloadPath << std::flush;
-		}
-		catch (exception& ex) 
-		{
-			cerr << ex.what() << endl;
+			file.write(reinterpret_cast<const char*>(&fileData[0]), fileData.size()).flush();
+			cout << "\r[Server]: " << fileData.size() << " bytes written to " << m_downloadPath << "          " << flush;
+			file.close();
 		}
 	}
 
 	void setDownloadPath(std::string path)
 	{
 		m_downloadPath = path;
-		//cout << m_downloadPath << endl;
 	}
 
 	std::string getFileName()
@@ -122,8 +121,8 @@ public:
 
 int main()
 {
-	CustomClient c;
-	c.connect("127.0.0.1", 6000);
+	CustomClient client;
+	client.connect("127.0.0.1", 6000);
 
 	bool key[6] = { false, false, false, false , false, false };
 	bool old_key[6] = { false, false, false, false, false, false };
@@ -145,20 +144,20 @@ int main()
 			key[5] = GetAsyncKeyState('6') & 0x8000;
 		}
 
-		if (key[0] && !old_key[0]) c.pingServer();
-		if (key[1] && !old_key[1]) c.messageServer();
-		if (key[2] && !old_key[2]) c.messageAll();
-		if (key[3] && !old_key[3]) c.uploadFile();
-		if (key[4] && !old_key[4]) c.downloadFile();
+		if (key[0] && !old_key[0]) client.pingServer();
+		if (key[1] && !old_key[1]) client.messageServer();
+		if (key[2] && !old_key[2]) client.publish();
+		if (key[3] && !old_key[3]) client.uploadFile();
+		if (key[4] && !old_key[4]) client.downloadFile();
 		if (key[5] && !old_key[5]) bQuit = true;
 
 		for (int i = 0; i < 6; i++) old_key[i] = key[i];
 
-		if (c.isConnected())
+		if (client.isConnected())
 		{
-			if (!c.incoming().empty())
+			if (!client.incoming().empty())
 			{
-				auto msg = c.incoming().pop_front().msg;
+				auto msg = client.incoming().pop_front().msg;
 
 				switch (msg.header.m_nid)
 				{
@@ -204,9 +203,9 @@ int main()
 						if (!fs::exists(downloadPath)) {
 							fs::create_directories(downloadPath);
 						}
-						downloadPath += "/" + c.getFileName();
+						downloadPath += "/" + client.getFileName();
 						clsrv::file::openWriteFile(downloadPath, ios_base::binary | ios_base::out);
-						c.setDownloadPath(downloadPath);
+						client.setDownloadPath(downloadPath);
 					}
 					catch (std::exception& ex)
 					{
@@ -217,9 +216,17 @@ int main()
 
 				case CustomMsgTypes::DownloadChunk:
 				{
-					c.handleDownloadFile(msg);
+					client.handleFileDownload(msg);
 				}
 				break;
+
+				case CustomMsgTypes::FileEnd:
+				{
+					cout << endl << endl;
+					cout << clsrv::file::extractFileName(client.getFileName()) << " Successfully Received from Server" << endl;
+				}
+				break;
+
 				}
 			}
 		}
