@@ -19,7 +19,6 @@ namespace clsrv
 			Connection(owner parent, asio::io_context& asioContext, asio::ip::tcp::socket socket, ThSfQueue<OwnedMessage<T>>& qIn);
 			virtual ~Connection();
 			uint32_t getID() const;
-		public:
 			void connectToClient(uint32_t uid = 0);
 			void connectToServer(const asio::ip::tcp::resolver::results_type& endpoints);
 			void disconnect();

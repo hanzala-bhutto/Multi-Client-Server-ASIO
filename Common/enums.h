@@ -7,11 +7,12 @@ enum class CustomMsgTypes : uint32_t
 	ServerDeny,
 	ServerPing,
 	MessageServer,
-	MessageAll,
+	Publish,
 	ServerMessage,
 	ServerMessageToClient,
-	UploadFileName,
+	UploadFileInfo,
 	UploadChunk,
 	DownloadFilePath,
 	DownloadChunk,
+	FileEnd
 };

@@ -77,9 +77,7 @@ namespace clsrv
 		void ServerInterface<T>::messageClient(std::shared_ptr<Connection<T>> client, const Message<T>& msg)
 		{
 			if (client && client->isConnected())
-			{
 				client->send(msg);
-			}
 			else
 			{
 				onClientDisconnect(client);

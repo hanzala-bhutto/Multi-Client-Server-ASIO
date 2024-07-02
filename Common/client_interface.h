@@ -14,7 +14,6 @@ namespace clsrv
 		public:
 			ClientInterface();
 			virtual ~ClientInterface();
-		public:
 			bool connect(const std::string& host, const uint16_t port);
 			void disconnect();
 			bool isConnected();

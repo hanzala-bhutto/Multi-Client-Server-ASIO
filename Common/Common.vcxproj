@@ -32,7 +32,6 @@
   <ItemGroup>
     <ClCompile Include="client_interface.cpp" />
     <ClCompile Include="connection.cpp" />
-    <ClCompile Include="file.cpp" />
     <ClCompile Include="server_interface.cpp" />
     <ClCompile Include="thsfqueue.cpp" />
   </ItemGroup>

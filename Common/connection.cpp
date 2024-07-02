@@ -50,7 +50,6 @@ namespace clsrv
 			}
 		}
 
-
 		template <typename T>
 		void Connection<T>::disconnect()
 		{

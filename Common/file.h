@@ -7,7 +7,7 @@ namespace clsrv
 	{
 		string inputPath(string in_path)
 		{
-			std::cout << "Enter path of file : ";
+			std::cout << "Enter path of file to upload: ";
 			std::getline(cin, in_path);
 			return in_path;
 		}
@@ -52,8 +52,8 @@ namespace clsrv
 
 		size_t calculateChunkSize(size_t fileSize)
 		{
-			size_t minChunkSize = 1024;
-			size_t maxChunkSize = 1024 * 1024 * 20; // 20 mb
+			size_t minChunkSize = 1024; // minimum 1kb
+			size_t maxChunkSize = 1024 * 1024 * 20; // maximum 20 mb
 			size_t chunkSize = (fileSize / 100);
 			while (chunkSize > maxChunkSize)
 			{
@@ -69,7 +69,6 @@ namespace clsrv
 			file.open(path, mode);
 			if (file.fail())
 				throw std::fstream::failure("Failed while opening file " + path);
-
 			return file;
 		}
 
@@ -92,12 +91,10 @@ namespace clsrv
 
 		void fileCompleted(ifstream& file)
 		{
-			if (file.eof()) {
+			if (file.eof())
 				cout << "File read successfully" << endl;
-			}
-			else if (file.fail()) {
+			else if (file.fail())
 				cerr << "Failed while reading file" << endl;
-			}
 		}
 	}
 }

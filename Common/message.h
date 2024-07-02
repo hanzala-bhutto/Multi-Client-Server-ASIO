@@ -60,7 +60,6 @@ namespace clsrv
 				return msg;
 			}
 
-			// Deserialization operator for std::string
 			friend Message<T>& operator>>(Message<T>& msg, std::string& str) {
 				str.clear();
 				for (auto it = msg.body.begin(); it != msg.body.end(); ++it) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "file.h"
 #include "message.h"
 #include "thsfqueue.h"
 #include "thsfqueue.cpp"
@@ -10,6 +11,4 @@
 #include "server_interface.cpp"
 #include "connection.h"
 #include "connection.cpp"
-#include "file.h"
-//#include "file.cpp"
 #include "enums.h"
