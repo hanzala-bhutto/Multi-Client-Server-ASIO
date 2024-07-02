@@ -35,14 +35,18 @@ protected:
 
 		case CustomMsgTypes::MessageServer:
 		{
-			string hero;
-			msg >> hero;
+			string message;
+			msg >> message;
 			cout << "[" << client->getID() << "]: ";
-			cout << hero << endl;
+			cout << message << endl;
+			clsrv::net::Message<CustomMsgTypes> serverMsg;
+			serverMsg.header.m_nid = CustomMsgTypes::ServerMessageToClient;
+			serverMsg << "Msg Received From Client " << to_string(client->getID()) << "\n";
+			client->send(serverMsg);
 		}
 		break;
 
-		case CustomMsgTypes::MessageAll:
+		case CustomMsgTypes::Publish:
 		{
 			cout << "[" << client->getID() << "]: Message All\n";
 			clsrv::net::Message<CustomMsgTypes> msg;
@@ -52,21 +56,19 @@ protected:
 		}
 		break;
 
-		case CustomMsgTypes::UploadFileName:
+		case CustomMsgTypes::UploadFileInfo:
 		{
 			string fileName;
 			msg >> fileName;
-
 			try
 			{
 				std::string out_path = "FilesDatabase/" + std::to_string(client->getID());
-				if (!fs::exists(out_path)) 
-				{
-					std::filesystem::create_directory(out_path);
-				}
+				if (!fs::exists(out_path))
+					std::filesystem::create_directories(out_path);
 				out_path += "/" + fileName;
 				m_clientFiles[client->getID()] = fileName;
 				clsrv::file::openWriteFile(out_path, std::ios_base::binary | std::ios_base::out);
+				cout << endl << "Incoming file from client " << to_string(client->getID()) << ": " << fileName << endl;
 			}
 			catch (std::exception& ex)
 			{
@@ -86,41 +88,33 @@ protected:
 			handleFileDownloadAsync(client,msg);
 		}
 		break;
+
+		case CustomMsgTypes::FileEnd:
+		{
+			cout << endl;
+			cout  << m_clientFiles[client->getID()] << " Successfully Received from client " << "[" << to_string(client->getID()) << "]" << endl;
+		}
+		break;
+
 		}
 	}
 	
 	void handleFileUpload(std::shared_ptr<clsrv::net::Connection<CustomMsgTypes>> client,
 		clsrv::net::Message<CustomMsgTypes>& msg) 
 	{
-		std::string out_path = "FilesDatabase/" + std::to_string(client->getID()) + "/" + m_clientFiles[client->getID()];
+		string out_path = "FilesDatabase/" + to_string(client->getID()) + "/" + m_clientFiles[client->getID()];
 		if (!fs::exists(out_path))
 			cout << "File path does not exist" << endl;
-
-		//std::unique_lock<std::mutex> mapLock(mutexForMap);
-		//if (m_clientMutexes.find(out_path) == m_clientMutexes.end())
-		//	m_clientMutexes[out_path] = std::make_unique<std::mutex>();
-
-		//std::unique_lock<std::mutex> lock(*m_clientMutexes[out_path], std::defer_lock);
-		//while (!lock.try_lock())
-		//	std::this_thread::sleep_for(std::chrono::milliseconds(10));
-		//lock.unlock();
-
-		//scoped_lock<mutex> lock(*m_clientMutexes[out_path]);
-		
-		std::scoped_lock lock(m_fileMutex);
+		scoped_lock lock(m_fileMutex);
 		{
-			const std::vector<uint8_t>& fileData = std::move(msg.body);
-			std::ofstream file(out_path, std::ios::binary | std::ios::app);
-
+			const vector<uint8_t>& fileData = std::move(msg.body);
+			ofstream file(out_path, ios::binary | ios::app);
 			while (!file.is_open())
-			{
-				file.open(out_path, std::ios_base::binary | std::ios_base::app);
-			}
-
+				file.open(out_path, ios::binary | ios::app);
 			if (file)
 			{
 				file.write(reinterpret_cast<const char*>(&fileData[0]), fileData.size()).flush();
-				std::cout << "\r[" << client->getID() << "]: " << fileData.size() << " bytes written to " << out_path << std::flush;
+				//cout << "\r[" << client->getID() << "]: " << fileData.size() << " bytes written to " << out_path << "           " << flush;
 				file.close();
 			}
 			else
@@ -128,27 +122,6 @@ protected:
 				cout << "Error Opening File" << endl;
 			}
 		}
-
-
-		//std::scoped_lock lock(m_fileMutex);
-		/*try 
-		{
-			m_targetFile.open(out_path, std::ios_base::binary | std::ios_base::app);
-			while (!m_targetFile.is_open()) 
-			{
-				m_targetFile.open(out_path, std::ios_base::binary | std::ios_base::app);
-			}
-			std::vector<uint8_t> buffer(msg.size());
-			buffer = std::move(msg.body);
-			msg.header.m_nsize = msg.size();
-			m_targetFile.write(reinterpret_cast<char*>(buffer.data()), buffer.size());
-			m_targetFile.close();
-			std::cout << "\r[" << client->getID() << "]: " << buffer.size() << " bytes written to " << out_path << std::flush;
-		}
-		catch (std::exception& ex) 
-		{
-			std::cerr << ex.what() << std::endl;
-		}*/
 	}
 
 	bool sendErrorMsg(std::shared_ptr<clsrv::net::Connection<CustomMsgTypes>> client,std::string file_path)
@@ -167,11 +140,19 @@ protected:
 
 	void sendDownloadPath(std::shared_ptr<clsrv::net::Connection<CustomMsgTypes>> client, std::string fileName)
 	{
-		std::string downloadPath = std::to_string(client->getID());
+		string downloadPath = std::to_string(client->getID());
 		clsrv::net::Message<CustomMsgTypes> fileUploadMsg;
 		fileUploadMsg.header.m_nid = CustomMsgTypes::DownloadFilePath;
 		fileUploadMsg << downloadPath;
 		messageClient(client,fileUploadMsg);
+	}
+
+	void sendEndFileMsg(std::shared_ptr<clsrv::net::Connection<CustomMsgTypes>> client)
+	{
+		clsrv::net::Message<CustomMsgTypes> fileCloseMsg;
+		fileCloseMsg.header.m_nid = CustomMsgTypes::FileEnd;
+		fileCloseMsg << "File Successfully Receieved";
+		messageClient(client, fileCloseMsg);
 	}
 
 	void handleFileDownloadAsync(std::shared_ptr<clsrv::net::Connection<CustomMsgTypes>> client,
@@ -180,7 +161,6 @@ protected:
 		std::string fileName;
 		msg >> fileName;
 		std::string filePath = "FilesDatabase/" + std::to_string(client->getID()) + "/" + fileName;
-		std::cout << filePath << std::endl;
 		if (sendErrorMsg(client,filePath)) return;
 		sendDownloadPath(client, fileName);
 		std::thread downloadThread([this, client, filePath]() {
@@ -191,7 +171,7 @@ protected:
 				std::cout << "File name: " << clsrv::file::extractFileName(filePath) << std::endl;
  				std::cout << "File size: " << fileSize << " bytes" << std::endl;
 				const size_t BUFFER_SIZE = clsrv::file::calculateChunkSize(fileSize);
-				cout << "Sending File in Chunks of " << BUFFER_SIZE << " bytes" << endl;
+				cout << "Sending File in Chunks of " << clsrv::file::getBytesToRead(fileSize, BUFFER_SIZE) << " bytes" << endl;
 				while (!sourceFile.eof() && fileSize > 0) {
 					std::vector<uint8_t> buffer = clsrv::file::readFile(sourceFile, fileSize, BUFFER_SIZE);
 					auto bytesToRead = clsrv::file::getBytesToRead(fileSize, BUFFER_SIZE);
@@ -203,9 +183,10 @@ protected:
 					fileSize -= bytesToRead;
 					std::cout << "\rBytes remaining: " << fileSize << std::flush;
 				}
-				cout << endl;
+				std::cout << "\rBytes remaining: " << fileSize << "          " << std::endl;
 				clsrv::file::fileCompleted(sourceFile);
 				sourceFile.close();
+				sendEndFileMsg(client);
 			}
 			catch (std::exception& ex)
 			{
@@ -241,7 +222,7 @@ protected:
 			}
 		}
 
-		void messageToAllClients()
+		void publish()
 		{
 			clsrv::net::Message<CustomMsgTypes> msg;
 			msg.header.m_nid = CustomMsgTypes::ServerMessageToClient;
@@ -254,8 +235,6 @@ protected:
 	private:
 		std::mutex m_fileMutex;
 		std::unordered_map<int, std::string> m_clientFiles;
-		//std::unordered_map<string, unique_ptr<std::mutex>> m_clientMutexes;
-		//std::mutex mutexForMap;
 };
 
 int main()
@@ -280,7 +259,7 @@ int main()
 			key[2] = GetAsyncKeyState('3') & 0x8000;
 		}
 		if (key[0] && !old_key[0]) s.messageToClient();
-		if (key[1] && !old_key[1]) s.messageToAllClients();
+		if (key[1] && !old_key[1]) s.publish();
 		if (key[2] && !old_key[2]) bQuit = true;
 
 		for (int i = 0; i < 3; i++) old_key[i] = key[i];
