@@ -29,6 +29,12 @@
     <ClInclude Include="server_interface.h" />
     <ClInclude Include="thsfqueue.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="client_interface.cpp" />
+    <ClCompile Include="connection.cpp" />
+    <ClCompile Include="server_interface.cpp" />
+    <ClCompile Include="thsfqueue.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -136,7 +142,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
