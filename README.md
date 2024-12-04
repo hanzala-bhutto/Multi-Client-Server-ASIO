@@ -10,7 +10,24 @@ A multi-client, asynchronous server-client framework built using the **Boost.Asi
 - **C++17 compatible**: Uses modern C++ standards for robust and clean code.
 
 ## Project Structure
-
+```bash
+Multi-Client-Server-ASIO/
+├── Client/                 # Client-side implementation
+│   ├── main.cpp            # Entry point for the client
+│   ├── Client.cpp          # Core client logic
+│   └── Client.hpp          # Client header file
+├── Server/                 # Server-side implementation
+│   ├── main.cpp            # Entry point for the server
+│   ├── Server.cpp          # Core server logic
+│   └── Server.hpp          # Server header file
+├── Common/                 # Shared utilities and definitions
+│   └── Utilities.hpp       # Helper functions and common definitions
+├── .gitattributes          # Git configuration file
+├── .gitignore              # Ignored files and directories
+├── LICENSE                 # License information
+├── README.md               # Documentation
+└── Client-Server-App.sln   # Visual Studio solution file
+```
 
 ## Dependencies
 
