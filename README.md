@@ -1,13 +1,34 @@
 # Multi-Client-Server-ASIO
 
-A multi-client, asynchronous server-client framework built using the **Boost.Asio** library in C++. This project demonstrates efficient and scalable communication between a server and multiple clients, leveraging modern C++ features and socket programming techniques.
+## Table of Contents
+- [Introduction](#introduction)
+- [Tech Stack](#tech-stack)
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Usage](#usage)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
+
+## Introduction
+
+Multi-Client-Server-ASIO is an asynchronous, multi-client server-client framework built using **Boost.Asio** in C++. It allows for scalable communication between a server and multiple clients, efficiently handling simultaneous connections with non-blocking I/O operations. This project demonstrates modern C++ socket programming with clean and modular code.
+
+## Tech Stack
+
+- **C++17**: Modern C++ features for clean and efficient code.
+- **Boost.Asio**: A library for asynchronous input/output operations and networking.
+- **Visual Studio**: IDE for development and solution management.
 
 ## Features
 
-- **Multi-client support**: Handles simultaneous connections efficiently.
-- **Asynchronous operations**: Uses Boost.Asio for non-blocking I/O.
-- **Modular design**: Separate components for client, server, and shared utilities.
-- **C++17 compatible**: Uses modern C++ standards for robust and clean code.
+- **Multi-client support**: Efficiently manages multiple simultaneous client connections.
+- **Asynchronous communication**: Non-blocking I/O for high performance and responsiveness.
+- **Modular architecture**: Separate client, server, and common utility code.
+- **Cross-platform compatibility**: Should work on any platform supporting Boost.Asio and C++17.
 
 ## Project Structure
 ```bash
@@ -29,20 +50,22 @@ Multi-Client-Server-ASIO/
 └── Client-Server-App.sln   # Visual Studio solution file
 ```
 
-## Dependencies
-
-- **Boost.Asio**: Core library for networking.
-- A modern C++ compiler with support for C++17.
-- Visual Studio or equivalent IDE for managing the solution.
-
 ## Getting Started
 
 ### Prerequisites
 
-- Install [Boost C++ Libraries](https://www.boost.org/).
-- Ensure a compatible C++17 compiler is installed.
+Before you begin, ensure you have the following installed:
+- A compatible C++ compiler with **C++17** support.
+- [Boost C++ Libraries](https://www.boost.org/), especially **Boost.Asio** for networking.
+- **Visual Studio** (or any other C++ IDE that supports Boost).
 
-### Building the Solution
+### Installation
+
+To set up the project locally:
+
+- Clone the repository:
+   ```bash
+   git clone https://github.com/hanzala-bhutto/Multi-Client-Server-ASIO.git
 
 - Open the `Client-Server-App.sln` file in Visual Studio (or your preferred IDE).
 - Build the solution to compile the server and client binaries.
@@ -52,6 +75,24 @@ Multi-Client-Server-ASIO/
 - Start the server application from the `Server` directory.
 - Launch the client application(s) from the `Client` directory.
 - Observe communication between the server and multiple clients.
+
+### Usage
+
+Once the project is built:
+
+- **Start the server**:
+   - Navigate to the `Server/` directory and launch the server application. 
+   - The server will listen for incoming client connections and handle communication with them.
+
+- **Launch the client(s)**:
+   - Navigate to the `Client/` directory.
+   - Launch one or more client applications. Each client will connect to the server and send requests.
+
+- **Monitor interaction**:
+   - Observe the communication between the server and the clients. The server should process requests and respond to each connected client.
+
+- **Simulate multiple clients**:
+   - To test scalability, you can simulate multiple clients by running several instances of the client application. This allows you to test how the server handles multiple simultaneous connections and requests.
 
 ## Contributing
 
